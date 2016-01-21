@@ -2,7 +2,7 @@
 #ifndef __AE_SERVER_H__
 #define __AE_SERVER_H__
 #include <time.h>
-#include <signal.h> 
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdlib.h>
@@ -16,13 +16,13 @@
 struct aeEventLoop;
 typedef struct _aeConnection
 {
-  int flags;
-  int fd;
-  char recv_buffer[10240];
-  int  recv_length; //last recv length
-  int  read_index;
-  char* client_ip;
-  int client_port;
+    int flags;
+    int fd;
+    char recv_buffer[10240];
+    int  recv_length; //last recv length
+    int  read_index;
+    char* client_ip;
+    int client_port;
 }aeConnection;
 
 typedef struct _aeServer aeServer;
@@ -30,25 +30,25 @@ typedef struct _aeReactor aeReactor;
 //reactor结构体
 struct _aeReactor
 {
-	void *object;
+    void *object;
     void *ptr;  //reserve
-	aeEventLoop *eventLoop;
-	
-	int epfd;
-	int id;
-	int event_num;
+    aeEventLoop *eventLoop;
+    
+    int epfd;
+    int id;
+    int event_num;
     int max_event_num;
     int running :1;
-	
-	aeConnection *socket_list;
-	//对事件操作
-	int (*add)(aeReactor *, int fd, int fdtype);
+    
+    aeConnection *socket_list;
+    //对事件操作
+    int (*add)(aeReactor *, int fd, int fdtype);
     int (*set)(aeReactor *, int fd, int fdtype);
     int (*del)(aeReactor *, int fd);
     int (*wait)(aeReactor *, struct timeval *);
     void (*free)(aeReactor *);
-
-	int (*write)(aeReactor *, int __fd, void *__buf, int __n);
+    
+    int (*write)(aeReactor *, int __fd, void *__buf, int __n);
     int (*close)(aeReactor *, int __fd);
 };
 
@@ -61,11 +61,11 @@ typedef struct _aeWorkerInfo
 
 typedef struct _workerBase
 {
-	int   pidx; //主进程中分的编号0-x
-	pid_t pid;
-	int pipefd;
-	int running;
-
+    int   pidx; //主进程中分的编号0-x
+    pid_t pid;
+    int pipefd;
+    int running;
+    
 }aWorkerBase;
 
 
@@ -79,31 +79,31 @@ typedef struct _aeReactorThread
 
 struct _aeServer
 {
-   char* listen_ip;
-   int listenfd;
-   int   port;
-   void *ptr2;
-   int reactorNum;
-   aeReactor* mainReactor;
-   aeConnection* connlist;
-   aeReactorThread *reactorThreads;
-   pthread_barrier_t barrier;
-   
-   int sigPipefd[2];
-
-   int  (*send)(  int fd, char* data , int len );
-   void (*close)( aeConnection *c  );   
-   void (*onConnect)( aeServer* serv ,int fd );
-   void (*onRecv)( aeServer *serv, aeConnection* c , int len );
-   void (*onClose)( aeServer *serv , aeConnection *c );
-   void (*runForever )( aeServer* serv );
+    char* listen_ip;
+    int listenfd;
+    int   port;
+    void *ptr2;
+    int reactorNum;
+    aeReactor* mainReactor;
+    aeConnection* connlist;
+    aeReactorThread *reactorThreads;
+    //pthread_barrier_t barrier;
+    
+    int sigPipefd[2];
+    
+    int  (*send)(  int fd, char* data , int len );
+    void (*close)( aeConnection *c  );
+    void (*onConnect)( aeServer* serv ,int fd );
+    void (*onRecv)( aeServer *serv, aeConnection* c , int len );
+    void (*onClose)( aeServer *serv , aeConnection *c );
+    void (*runForever )( aeServer* serv );
 };
 
 
 typedef struct _reactorThreadParam
 {
-	int thid;
-	aeServer* serv;
+    int thid;
+    aeServer* serv;
 }reactorThreadParam;
 
 

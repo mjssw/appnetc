@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		36251B611C5119F200DD30D8 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 36251B601C5119F200DD30D8 /* main.c */; };
+		36251B6B1C51202C00DD30D8 /* socketserver.c in Sources */ = {isa = PBXBuildFile; fileRef = 36251B691C51202C00DD30D8 /* socketserver.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +26,10 @@
 /* Begin PBXFileReference section */
 		36251B5D1C5119F200DD30D8 /* appnetc */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = appnetc; sourceTree = BUILT_PRODUCTS_DIR; };
 		36251B601C5119F200DD30D8 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		36251B671C51202C00DD30D8 /* build */ = {isa = PBXFileReference; lastKnownFileType = folder; path = build; sourceTree = "<group>"; };
+		36251B681C51202C00DD30D8 /* include */ = {isa = PBXFileReference; lastKnownFileType = folder; path = include; sourceTree = "<group>"; };
+		36251B691C51202C00DD30D8 /* socketserver.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = socketserver.c; sourceTree = "<group>"; };
+		36251B6A1C51202C00DD30D8 /* src */ = {isa = PBXFileReference; lastKnownFileType = folder; path = src; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +63,10 @@
 			isa = PBXGroup;
 			children = (
 				36251B601C5119F200DD30D8 /* main.c */,
+				36251B671C51202C00DD30D8 /* build */,
+				36251B681C51202C00DD30D8 /* include */,
+				36251B691C51202C00DD30D8 /* socketserver.c */,
+				36251B6A1C51202C00DD30D8 /* src */,
 			);
 			path = appnetc;
 			sourceTree = "<group>";
@@ -119,6 +128,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				36251B611C5119F200DD30D8 /* main.c in Sources */,
+				36251B6B1C51202C00DD30D8 /* socketserver.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -232,6 +242,7 @@
 				36251B661C5119F200DD30D8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
