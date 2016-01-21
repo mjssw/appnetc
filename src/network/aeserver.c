@@ -145,76 +145,6 @@ void onAcceptEvent( aeEventLoop *el, int fd, void *privdata, int mask)
         	acceptCommonHandler( servG , connfd,client_ip,client_port,0 );  
 	 }
 	}
-<<<<<<< HEAD
-=======
-	//如果收到主进程发来的信号事件,这是主进程发来的。。同一个进程间的通信。。
-	else if( fd == aEvBase.sig_pipefd[0] )
-	{   printf( "Recv Master Siginal fd=%d...\n" , fd );	
-		int sig,ret,i;
-		char signals[1024];
-		ret = recv( aEvBase.sig_pipefd[0], signals, sizeof( signals ), 0 );
-		if( ret == -1 )
-		{
-		  return;
-		}
-		else if( ret == 0 )
-		{
-		  return;
-		}
-		else
-		{
-			for(  i = 0; i < ret; ++i )
-			{
-				switch( signals[i] )
-				{
-					//child process stoped
-					case SIGCHLD:
-					{
-						printf( "Master recv child process stoped signal\n");
-						pid_t pid;
-						int stat,pidx;
-						//WNOHANG
-						while ( ( pid = waitpid( -1, &stat, 0 ) ) > 0 )
-						{
-							for( pidx = 0; pidx < WORKER_PROCESS_COUNT; ++pidx )
-							{
-								if( aEvBase.worker_process[pidx].pid == pid )
-								{
-									//aeDeleteFileEvent( aEvBase.el,aEvBase.worker_process[i].pipefd[0] ,AE_READABLE );
-									close( aEvBase.worker_process[pidx].pipefd[0] );
-									aEvBase.worker_process[pidx].pid = -1;
-								}
-						        }
-						}
-						aEvBase.running = 0;
-						aeStop( aEvBase.el );
-						break;
-					}
-					case SIGTERM:
-					case SIGQUIT:
-					case SIGINT:
-					{
-						int i;
-						printf( "master kill all the clild now\n" );
-						for( i = 0; i < WORKER_PROCESS_COUNT; ++i )
-						{
-							int pid = aEvBase.worker_process[i].pid;
-							//alarm/kill send signal to process,
-							//in child process need install catch signal functions;
-							kill( pid, SIGTERM );
-						}
-						break;
-					}
-					default:
-					{
-						break;
-					}
-				}
-			}
-		} 
-	}
-	return;
->>>>>>> 70c7e6030edbd139daf8e84ebe281685a8b6674e
 }
 
 
@@ -303,7 +233,6 @@ aeServer* aeServerCreate( char* ip,int port )
     serv->close = freeClient;
     serv->listen_ip = ip;
     serv->port = port; 
-<<<<<<< HEAD
     serv->connlist = shm_calloc( 1024 , sizeof( aeConnection ));
 	
     serv->reactorNum = 2;
@@ -312,24 +241,6 @@ aeServer* aeServerCreate( char* ip,int port )
     serv->mainReactor = zmalloc( sizeof( aeReactor ));
     serv->mainReactor->eventLoop = aeCreateEventLoop( 10 );
     aeSetBeforeSleepProc( serv->mainReactor->eventLoop ,initOnLoopStart );
-=======
-    bzero( &aEvBase , sizeof( aEvBase ));
-    aEvBase.serv = serv;    
-
-
-    if( aEvBase.running )
-    {
-	  exit( 0 );
-    }
-    aEvBase.running = 1;
-    aEvBase.pid = getpid();
-    aEvBase.usable_cpu_num = sysconf(_SC_NPROCESSORS_ONLN);
-    serv->connlist = shm_calloc( 1024 , sizeof( userClient ));
-
-
-    aEvBase.el = aeCreateEventLoop( 1024 );
-    aeSetBeforeSleepProc(aEvBase.el,initOnLoopStart );
->>>>>>> 70c7e6030edbd139daf8e84ebe281685a8b6674e
 
     printf( "Main reactor event loop addr=%x,threadid=%d \n" , serv->mainReactor->eventLoop , pthread_self() );
     //install signal
@@ -421,10 +332,6 @@ int startServer( aeServer* serv )
 	
 	puts("Master Exit ,Everything is ok !!!\n");
 	shm_free( serv->connlist,1 );
-<<<<<<< HEAD
-	//shm_free( serv->reactorThreads , 1 );
-=======
->>>>>>> 70c7e6030edbd139daf8e84ebe281685a8b6674e
 	if( serv != NULL )
 	{
 	   zfree( serv );

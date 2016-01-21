@@ -168,11 +168,6 @@ int shareMemory_sysv_free(shareMemory *object, int rm)
     int ret = shmdt(object->mem);
     if (rm == 1)
     {
-<<<<<<< HEAD
-	printf( "shm free RMID shmid=%d.. \n" , shmid );
-=======
-	printf( "shm free RMID shmid=%d.. \n", shmid );
->>>>>>> 70c7e6030edbd139daf8e84ebe281685a8b6674e
         shmctl( shmid, IPC_RMID, NULL);
     }
     return ret;

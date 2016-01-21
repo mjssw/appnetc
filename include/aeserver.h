@@ -83,7 +83,6 @@ struct _aeServer
    int listenfd;
    int   port;
    void *ptr2;
-<<<<<<< HEAD
    int reactorNum;
    aeReactor* mainReactor;
    aeConnection* connlist;
@@ -92,14 +91,6 @@ struct _aeServer
    
    int sigPipefd[2];
 
-=======
-   userClient* connlist;
-
-   void (*runForever )( aeServer* serv );
-   void (*onConnect)( aeServer* serv , int fd );
-   void (*onRecv)( aeServer *serv, userClient* client , int len );
-   void (*onClose)( aeServer *serv , userClient *c );
->>>>>>> 70c7e6030edbd139daf8e84ebe281685a8b6674e
    int  (*send)(  int fd, char* data , int len );
    void (*close)( aeConnection *c  );   
    void (*onConnect)( aeServer* serv ,int fd );
