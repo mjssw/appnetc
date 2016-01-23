@@ -16,6 +16,7 @@ SET (HEADER_FILES
 SET (SOURCE_FILES
  ../socketserver.c
  ../src/network/aeserver.c 
+ ../src/network/worker.c 
  ../src/network/zmalloc.c 
  ../src/network/ae.c 
  ../src/network/anet.c 
