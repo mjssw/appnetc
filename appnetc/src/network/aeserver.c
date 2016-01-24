@@ -403,7 +403,7 @@ void installMasterSignal( aeServer* serv )
     
     //装载信号，指定回调函数,如果用户引发信号事件，则回调。
     addSignal( SIGCHLD, masterSignalHandler , 1 );	//catch child process exit event
-    addSignal( SIGTERM, masterSignalHandler , 1 );  //catch exit event by kill or Ctrl+C ..
+    //addSignal( SIGTERM, masterSignalHandler , 1 );  //catch exit event by kill or Ctrl+C ..
     addSignal( SIGINT,  masterSignalHandler , 1 );
     addSignal( SIGPIPE, SIG_IGN , 1 );
 }
@@ -576,6 +576,12 @@ void stopReactorThread( aeServer* serv  )
 		{
 			zfree( serv->reactorThreads[i].param );
 		}
+		
+		if( serv->reactorThreads[i].reactor.eventLoop != NULL )
+		{
+		   aeDeleteEventLoop( serv->reactorThreads[i].reactor.eventLoop  );
+		}
+		
 	}
 }
 
