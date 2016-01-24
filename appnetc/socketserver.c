@@ -7,12 +7,14 @@ void appnetServerOnClose( aeServer* s , aeConnection *c );
 void appnetServerOnConnect( aeServer* s , int fd );
 aeServer* appnetTcpServInit( char* listen_ip , int port  );
 
-void appnetServerOnRecv( aeServer* s , aeConnection *c , int len )
+void appnetServerOnRecv( aeServer* serv , aeConnection *conn , int len )
 {
-     printf( "PHPD recv len=%lu,data=%s,threadid=%d\n" ,strlen( c->recv_buffer ) , c->recv_buffer,pthread_self() );
-     //s->send( c->fd , c->recv_buffer, strlen( c->recv_buffer ) );
-     char* buff = "recv ok!";
-     sendMessageToReactor( c->fd , buff , strlen( buff ));
+	 printf( "PHPD recv len=%lu,data=%s,threadid=%d\n" ,strlen( conn->recv_buffer ) ,
+			conn->recv_buffer,pthread_self() );
+	 
+	 char* buff = "recv ok!";
+	 serv->send( conn->fd , buff , strlen( buff ));
+	 //serv->close( conn->fd );
 }
 
 void appnetServerOnClose( aeServer* s , aeConnection *c )
@@ -24,8 +26,6 @@ void appnetServerOnConnect( aeServer* s , int fd )
 {
      printf( "PHPD New Client Connected fd=%d,threadid=%d \n", fd,pthread_self()   );
      char* buff = "connect ok!"; 
-  ///  sendMessageToReactor( fd , buff , strlen( buff ));
-   // s->send( fd , buff , strlen( buff ) );
 }
 
 

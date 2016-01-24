@@ -220,11 +220,70 @@ int reactorSend2Worker(  aeServer* serv , int fd , aePipeData data )
 {
     int sendlen = 0;
     int workerid = fd % serv->workerNum;
-    //printf( "reactorSend2Worker pipefd=%d \n" , serv->workers[workerid].pipefd[0] );
+
+	//此处可以考虑换成pthread_spin_lock
+	pthread_mutex_lock( &serv->workers[workerid].w_mutex );
     sendlen = anetWrite( serv->workers[workerid].pipefd[0], &data , sizeof( aePipeData ) );
+    pthread_mutex_unlock( &serv->workers[workerid].w_mutex );
+
     //printf( "reactorSend2Worker send len=%d,errno=%d,errstr=%s,fd=%d,workerid=%d \n" , sendlen ,errno, strerror(errno),fd,workerid );
     return sendlen;
 }
+
+
+void readFromWorkerPipe( aeEventLoop *el, int fd, void *privdata, int mask)
+{
+    int readlen =0;
+    char buf[10240];
+    
+	int workerid = fd % servG->workerNum;
+	pthread_mutex_lock( &servG->workers[workerid].r_mutex );
+    readlen = read( fd, &buf, sizeof( buf ) ); //
+	pthread_mutex_unlock( &servG->workers[workerid].r_mutex );
+	
+    if( readlen == 0 )
+    {
+        close( fd );
+    }
+    else if( readlen > 0 )
+    {
+        aePipeData data;
+        memcpy( &data , &buf ,sizeof( data ) );
+        
+        //message,close
+        if( data.type == PIPE_EVENT_MESSAGE )
+        {
+            if( servG->sendToClient )
+            {
+                servG->sendToClient( data.connfd , servG->connlist[data.connfd].send_buffer , data.len  );
+            }
+        }
+        else if( data.type == PIPE_EVENT_CLOSE )
+        {
+            //close client socket
+            if( servG->closeClient )
+            {
+                servG->closeClient( &servG->connlist[data.connfd] );
+            }
+        }
+        else
+        {
+            printf( "recvFromPipe recv unkown data.type=%d" , data.type );
+        }
+    }
+    else
+    {
+        if( errno == EAGAIN )
+        {
+            return;
+        }
+        else
+        {
+            printf( "Reactor Recv errno=%d,errstr=%s \n" , errno , strerror( errno ));
+        }
+    }
+}
+
 
 
 void acceptCommonHandler( aeServer* serv ,int fd,char* client_ip,int client_port, int flags)
@@ -354,8 +413,10 @@ aeServer* aeServerCreate( char* ip,int port )
 {
     aeServer* serv = (aeServer*)zmalloc( sizeof(aeServer ));
     serv->runForever = startServer;
-    serv->send = anetWrite;
-    serv->close = freeClient;
+	serv->send =  sendMessageToReactor;
+    serv->close = sendCloseEventToReactor;
+	serv->sendToClient = anetWrite;
+	serv->closeClient = freeClient;
     serv->listen_ip = ip;
     serv->port = port;
     serv->reactorNum = 2;
@@ -411,56 +472,6 @@ aeReactorThread getReactorThread( aeServer* serv, int i )
     return (aeReactorThread)(serv->reactorThreads[i]);
 }
 
-//fd为管道fd
-void readFromWorkerPipe( aeEventLoop *el, int fd, void *privdata, int mask)
-{
-    int readlen =0;
-    char buf[10240];
-    
-    readlen = read( fd, &buf, sizeof( buf ) ); //
-    if( readlen == 0 )
-    {
-        close( fd );
-    }
-    else if( readlen > 0 )
-    {
-        aePipeData data;
-        memcpy( &data , &buf ,sizeof( data ) );
-        
-        //message,close
-        if( data.type == PIPE_EVENT_MESSAGE )
-        {
-            if( servG->send )
-            {
-                servG->send( data.connfd , servG->connlist[data.connfd].send_buffer , data.len  );
-            }
-        }
-        else if( data.type == PIPE_EVENT_CLOSE )
-        {
-            //close client socket
-            if( servG->close )
-            {
-                servG->close( &servG->connlist[data.connfd] );
-            }
-        }
-        else
-        {
-            printf( "recvFromPipe recv unkown data.type=%d" , data.type );
-        }
-    }
-    else
-    {
-        if( errno == EAGAIN )
-        {
-            return;
-        }
-        else
-        {
-            printf( "Reactor Recv errno=%d,errstr=%s \n" , errno , strerror( errno ));
-        }
-    }
-}
-
 
 void *reactorThreadRun(void *arg)
 {
@@ -511,6 +522,10 @@ void createWorkerProcess( aeServer* serv )
     int ret,i;
     for(  i = 0; i < serv->workerNum; i++ )
     {
+		//init mutex
+		pthread_mutex_init( &(serv->workers[i].r_mutex) ,NULL);
+		pthread_mutex_init( &(serv->workers[i].w_mutex) ,NULL);
+		
         ret = socketpair( PF_UNIX, SOCK_STREAM, 0, serv->workers[i].pipefd );
         assert( ret != -1 );
         serv->workers[i].pid = fork();

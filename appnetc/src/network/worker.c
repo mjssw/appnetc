@@ -1,7 +1,4 @@
 
-//https://github.com/lchb369/Aenet.git
-
-
 #include <stdio.h>
 #include <stddef.h>
 #include <time.h>
@@ -15,11 +12,11 @@
 //======================
 void initWorkerOnLoopStart( aeEventLoop *l)
 {
-    //   puts("worker Event Loop Init!!! \n");
+    //puts("worker Event Loop Init!!! \n");
 }
 
 
-void sendMessageToReactor( int connfd , char* buff , int len )
+int sendMessageToReactor( int connfd , char* buff , int len )
 {
     memset( servG->connlist[connfd].send_buffer , 0 , sizeof( servG->connlist[connfd].recv_buffer ) );
     memcpy( servG->connlist[connfd].send_buffer , buff , len );
@@ -27,16 +24,16 @@ void sendMessageToReactor( int connfd , char* buff , int len )
     data.type = PIPE_EVENT_MESSAGE;
     data.connfd = connfd;
     data.len = len;
-    send2ReactorThread( connfd , data );
+    return send2ReactorThread( connfd , data );
 }
 
-void sendCloseEventToReactor( int connfd  )
+int sendCloseEventToReactor( int connfd  )
 {
     aePipeData data;
     data.type = PIPE_EVENT_CLOSE;
     data.connfd = connfd;
     data.len = 0;
-    send2ReactorThread( connfd , data );
+    return send2ReactorThread( connfd , data );
 }
 
 
