@@ -9,7 +9,7 @@ aeServer* appnetTcpServInit( char* listen_ip , int port  );
 
 void appnetServerOnRecv( aeServer* s , aeConnection *c , int len )
 {
-     printf( "PHPD recv len=%d,data=%s,threadid=%d\n" ,strlen( c->recv_buffer ) , c->recv_buffer,pthread_self() );
+     printf( "PHPD recv len=%lu,data=%s,threadid=%d\n" ,strlen( c->recv_buffer ) , c->recv_buffer,pthread_self() );
      //s->send( c->fd , c->recv_buffer, strlen( c->recv_buffer ) );
      char* buff = "recv ok!";
      sendMessageToReactor( c->fd , buff , strlen( buff ));
@@ -47,7 +47,7 @@ void appnetTcpServRun()
 
 int main()
 {
-  aeServer* serv = appnetTcpServInit( "0.0.0.0" , 3011 );
+  appnetTcpServInit( "0.0.0.0" , 3011 );
   appnetTcpServRun();
 return 0;
 }

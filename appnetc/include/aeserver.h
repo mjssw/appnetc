@@ -42,17 +42,6 @@ struct _aeReactor
 	int event_num;
     int max_event_num;
     int running :1;
-	
-	aeConnection *socket_list;
-	//对事件操作
-	int (*add)(aeReactor *, int fd, int fdtype);
-    int (*set)(aeReactor *, int fd, int fdtype);
-    int (*del)(aeReactor *, int fd);
-    int (*wait)(aeReactor *, struct timeval *);
-    void (*free)(aeReactor *);
-
-	int (*write)(aeReactor *, int __fd, void *__buf, int __n);
-    int (*close)(aeReactor *, int __fd);
 };
 
 
@@ -100,7 +89,7 @@ struct _aeServer
    aeReactor* mainReactor;
    aeConnection* connlist;
    aeReactorThread *reactorThreads;
-   pthread_barrier_t barrier;
+   //pthread_barrier_t barrier;
    aeWorkerProcess *workers; //主进程中保存的worker相当信息数组。
    aeWorker* worker;	//子进程中的全局变量,子进程是独立空间，所以只要一个标识当前进程
    int sigPipefd[2];

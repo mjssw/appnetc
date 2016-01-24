@@ -12,13 +12,10 @@
 #include <sys/socket.h>
 #include "aeserver.h"
 
-
-//extern aEvBase;
-//extern aWorker;
 //======================
-void initWorkerOnLoopStart( aeEventLoop *l) 
+void initWorkerOnLoopStart( aeEventLoop *l)
 {
- //   puts("worker Event Loop Init!!! \n");
+    //   puts("worker Event Loop Init!!! \n");
 }
 
 
@@ -30,15 +27,24 @@ void sendMessageToReactor( int connfd , char* buff , int len )
     data.type = PIPE_EVENT_MESSAGE;
     data.connfd = connfd;
     data.len = len;
-    send2ReactorThread( connfd , data );	    
-} 
+    send2ReactorThread( connfd , data );
+}
+
+void sendCloseEventToReactor( int connfd  )
+{
+    aePipeData data;
+    data.type = PIPE_EVENT_CLOSE;
+    data.connfd = connfd;
+    data.len = 0;
+    send2ReactorThread( connfd , data );
+}
 
 
 int socketWrite(int __fd, void *__data, int __len)
 {
     int n = 0;
     int written = 0;
-
+    
     while (written < __len)
     {
         n = write(__fd, __data + written, __len - written);
@@ -54,7 +60,7 @@ int socketWrite(int __fd, void *__data, int __len)
             }
             else
             {
-                 printf("write %d bytes failed.", __len);
+                printf("write %d bytes failed.", __len);
                 return AE_ERR;
             }
         }
@@ -66,67 +72,67 @@ int socketWrite(int __fd, void *__data, int __len)
 
 int send2ReactorThread( int connfd , aePipeData data )
 {
-   int sendlen;
-   int pipefd =  servG->worker->pipefd;
-   sendlen = socketWrite( pipefd , &data , sizeof( data ) );
-   if( sendlen < 0 )
-   {
-	   printf( "send2ReactorThread error errno=%d \n" , errno );
-   }
+    int sendlen;
+    int pipefd =  servG->worker->pipefd;
+    sendlen = socketWrite( pipefd , &data , sizeof( data ) );
+    if( sendlen < 0 )
+    {
+        printf( "send2ReactorThread error errno=%d \n" , errno );
+    }
 }
 
 
 void recvFromPipe( aeEventLoop *el, int fd, void *privdata, int mask )
 {
-	int readlen =0;
-	char buf[PIPE_DATA_LENG+PIPE_DATA_HEADER_LENG];
-	
-	//此处如果要把数据读取到大于包长的缓冲区中，不要用anetRead，否则就掉坑里了
-	readlen = anetRead( fd, buf, sizeof( buf )  );
-	if( readlen == 0 )
-	{
-	   //printf( "worker read from pipe close event fd=%d...\n" , fd );
-	   //close( fd );
-	}
-	else if( readlen > 0 )
-	{
-		aePipeData data;
-		memcpy( &data , &buf ,sizeof( data ) );		
-		printf( "Worker Recv pipefd=%d, pid=%d,readlen=%d,connfd=%d...\n" , fd , getpid(),readlen , data.connfd );	
-		//connect,read,close
-		if( data.type == PIPE_EVENT_CONNECT )
-		{
-		    printf( "Worker Recv New Connect fd=%d...\n" , data.connfd );
-		    if( servG->onConnect )
-		    {
-				servG->onConnect( servG , data.connfd );
-		    }
-		}
-		else if( data.type == PIPE_EVENT_MESSAGE )
-		{
-		   if( servG->onRecv )
-		   {
-			servG->onRecv( servG , &servG->connlist[data.connfd] , data.len  );
-		   }	
-		}
-		else if( data.type == PIPE_EVENT_CLOSE )
-		{
-		   if( servG->onClose )
-		   {
-			servG->onClose( servG , &servG->connlist[data.connfd] );
-		   }
-		}
-		else
-		{
-		   printf( "recvFromPipe recv unkown data.type=%d" , data.type );
-		}
-	}
+    int readlen =0;
+    char buf[PIPE_DATA_LENG+PIPE_DATA_HEADER_LENG];
+    
+    //此处如果要把数据读取到大于包长的缓冲区中，不要用anetRead，否则就掉坑里了
+    readlen = anetRead( fd, buf, sizeof( buf )  );
+    if( readlen == 0 )
+    {
+        //printf( "worker read from pipe close event fd=%d...\n" , fd );
+        //close( fd );
+    }
+    else if( readlen > 0 )
+    {
+        aePipeData data;
+        memcpy( &data , &buf ,sizeof( data ) );
+        //printf( "Worker Recv pipefd=%d, pid=%d,readlen=%d,connfd=%d...\n" , fd , getpid(),readlen , data.connfd );
+        //connect,read,close
+        if( data.type == PIPE_EVENT_CONNECT )
+        {
+            //printf( "Worker Recv New Connect fd=%d...\n" , data.connfd );
+            if( servG->onConnect )
+            {
+                servG->onConnect( servG , data.connfd );
+            }
+        }
+        else if( data.type == PIPE_EVENT_MESSAGE )
+        {
+            if( servG->onRecv )
+            {
+                servG->onRecv( servG , &servG->connlist[data.connfd] , data.len  );
+            }
+        }
+        else if( data.type == PIPE_EVENT_CLOSE )
+        {
+            if( servG->onClose )
+            {
+                servG->onClose( servG , &servG->connlist[data.connfd] );
+            }
+        }
+        else
+        {
+            printf( "recvFromPipe recv unkown data.type=%d" , data.type );
+        }
+    }
 }
 
 int timerCallback(struct aeEventLoop *l,long long id,void *data)
 {
-	printf("I'm time_cb,here [EventLoop: %p],[id : %lld],[data: %p] \n",l,id,data);
-	return 5*1000;
+    printf("I'm time_cb,here [EventLoop: %p],[id : %lld],[data: %p] \n",l,id,data);
+    return 5*1000;
 }
 
 void finalCallback(struct aeEventLoop *l,void *data)
@@ -134,20 +140,6 @@ void finalCallback(struct aeEventLoop *l,void *data)
     puts("call the unknow final function \n");
 }
 
-/*
-void addSignal( int sig, void(*handler)(int), int restart  )
-{
-    struct sigaction sa;
-    memset( &sa, '\0', sizeof( sa ) );
-    sa.sa_handler = handler;
-    if( restart == 1 )
-    {
-        sa.sa_flags |= SA_RESTART;
-    }
-    sigfillset( &sa.sa_mask );
-    assert( sigaction( sig, &sa, NULL ) != -1 );
-}
-*/
 void childTermHandler( int sig )
 {
     printf( "Worker Recv Int Signal...\n");
@@ -169,47 +161,46 @@ void childChildHandler( int sig )
 /**
  * process event types:
  * 1,parent process send readable event
- * 2,process recv/send event 
-*/
+ */
 void runWorkerProcess( int pidx ,int pipefd )
 {
     printf( "run worker process...\n");
-	//每个进程私有的。
-	aeWorker* worker = zmalloc( sizeof( aeWorker ));
-	worker->pid = getpid();
-	worker->maxClient=1024;
-	worker->pidx = pidx;
-	worker->pipefd = pipefd;
-	worker->running = 1;
-	servG->worker = worker;
-	
-	//这里要安装信号接收器..
-	addSignal( SIGTERM, childTermHandler, 0 );
-        addSignal( SIGCHLD, childChildHandler , 1 );
-	
-	worker->el = aeCreateEventLoop( worker->maxClient );
-	aeSetBeforeSleepProc( worker->el,initWorkerOnLoopStart );
-	int res;
-
-    	printf( "Worker listen Pipefd = %d \n" , worker->pipefd );
-	
-	//监听父进程管道事件
-	res = aeCreateFileEvent( worker->el,
-		worker->pipefd,
-		AE_READABLE,
-		recvFromPipe,NULL
-	);
-   
-	printf("Worker pid=%d create file event is ok? [%d]\n",worker->pid,res==0 );
-	
-	//定时器
-	//res = aeCreateTimeEvent(el,5*1000,timerCallback,NULL,finalCallback);
-	//printf("create time event is ok? [%d]\n",!res);
-
-	aeMain(worker->el);
-	aeDeleteEventLoop(worker->el);
+    //每个进程私有的。
+    aeWorker* worker = zmalloc( sizeof( aeWorker ));
+    worker->pid = getpid();
+    worker->maxClient=1024;
+    worker->pidx = pidx;
+    worker->pipefd = pipefd;
+    worker->running = 1;
+    servG->worker = worker;
+    
+    //这里要安装信号接收器..
+    addSignal( SIGTERM, childTermHandler, 0 );
+    addSignal( SIGCHLD, childChildHandler , 1 );
+    
+    worker->el = aeCreateEventLoop( worker->maxClient );
+    aeSetBeforeSleepProc( worker->el,initWorkerOnLoopStart );
+    int res;
+    
+    printf( "Worker listen Pipefd = %d \n" , worker->pipefd );
+    
+    //监听父进程管道事件
+    res = aeCreateFileEvent( worker->el,
+                            worker->pipefd,
+                            AE_READABLE,
+                            recvFromPipe,NULL
+                            );
+    
+    printf("Worker pid=%d create file event is ok? [%d]\n",worker->pid,res==0 );
+    
+    //定时器
+    //res = aeCreateTimeEvent(el,5*1000,timerCallback,NULL,finalCallback);
+    //printf("create time event is ok? [%d]\n",!res);
+    
+    aeMain(worker->el);
+    aeDeleteEventLoop(worker->el);
     close( pipefd );
     zfree( worker );    
-	shm_free( servG->connlist , 0 );
+    shm_free( servG->connlist , 0 );
     printf( "Worker pid=%d exit...\n" , worker->pid );
 }
