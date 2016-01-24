@@ -451,12 +451,11 @@ void createReactorThreads( aeServer* serv  )
     for( i=0;i<serv->reactorNum;i++)
     {
         thread = &(serv->reactorThreads[i]);
+        thread->param = zmalloc( sizeof( reactorThreadParam ));
+        thread->param->serv = serv;
+        thread->param->thid = i;
         
-        reactorThreadParam* param = zmalloc( sizeof( reactorThreadParam ));
-        param->serv = serv;
-        param->thid = i;
-        
-        res = pthread_create(&threadid, NULL, reactorThreadRun , (void *)param );
+        res = pthread_create(&threadid, NULL, reactorThreadRun , (void *)thread->param );
         if (res != 0)
         {
             perror("Thread creat failed!");
@@ -497,6 +496,7 @@ void *reactorThreadRun(void *arg)
     aeSetBeforeSleepProc( el ,initThreadOnLoopStart );
     aeMain(  el );
     aeDeleteEventLoop( el );
+	el = NULL;
     //printf( "thread end loop id=%d \n" , thid );
 }
 
@@ -568,6 +568,15 @@ void stopReactorThread( aeServer* serv  )
             printf( "pthread join error \n");
         }
     }
+	
+	//free memory
+	for( i=0;i<serv->reactorNum;i++)
+    {
+		if( serv->reactorThreads[i].param  )
+		{
+			zfree( serv->reactorThreads[i].param );
+		}
+	}
 }
 
 void destroyServer( aeServer* serv )

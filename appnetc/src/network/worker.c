@@ -140,7 +140,6 @@ void finalCallback(struct aeEventLoop *l,void *data)
 void childTermHandler( int sig )
 {
     printf( "Worker Recv Int Signal...\n");
-    servG->worker->running = 0;
     aeStop( servG->worker->el );
 }
 
@@ -197,7 +196,10 @@ void runWorkerProcess( int pidx ,int pipefd )
     aeMain(worker->el);
     aeDeleteEventLoop(worker->el);
     close( pipefd );
+	
+	printf( "Worker pid=%d exit...\n" , worker->pid );
     zfree( worker );    
     shm_free( servG->connlist , 0 );
-    printf( "Worker pid=%d exit...\n" , worker->pid );
+	exit( 0 );
+   
 }

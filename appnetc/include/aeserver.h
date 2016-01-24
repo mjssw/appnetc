@@ -30,6 +30,8 @@ typedef struct _aeConnection
 
 typedef struct _aeServer aeServer;
 typedef struct _aeReactor aeReactor;
+typedef struct _reactorThreadParam reactorThreadParam;
+
 //reactor结构体
 struct _aeReactor
 {
@@ -68,6 +70,7 @@ typedef struct _aeReactorThread
 {
     pthread_t thread_id;
     aeReactor reactor;
+    reactorThreadParam* param
     //swLock lock;
 } aeReactorThread;
 
@@ -109,11 +112,11 @@ struct _aeServer
    void (*runForever )( aeServer* serv );
 };
 
-typedef struct _reactorThreadParam
+struct _reactorThreadParam
 {
 	int thid;
 	aeServer* serv;
-}reactorThreadParam;
+};
 
 #define PIPE_DATA_LENG 8
 #define PIPE_DATA_HEADER_LENG 1+2*sizeof(int)
