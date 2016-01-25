@@ -1,36 +1,8 @@
 
-//https://github.com/lchb369/Aenet.git
-
 /*************************************************************************
  多线程的网络IO，多进程的任务处理服务器。
- --------------------master------------------
- 
- 1,主进程listen到一个端口上
- 2,创建M对用于与worker通信的pipe，创建M个woker进程.
- 3,创建N个reactor线程，reactor是event loop的封装，并提供回调函数。
- 线程数量可配置,将线程数组保存在全局变量中.
- 4,收到新连接，将收到连接的消息和fd发给worker，可用fd%N确定发给哪个worker，并记录下workerid
- 5,收到客户端消息,将收到连接的消息和fd发给相应id的worker
- 6,收到关闭消息，也通知给worker
- 
- --------------------worker------------------
- 1,worker进程是用来处理逻辑的。
- 2,worker进程的消息来源于pipe,是由主进程中的某个线程reactor发过来的
- 3,worker进程只接收pipe事件，所以初始化时，就要将pipe加入event loop中
- 4,发送消息，也要通过pipe先发送给主进程中相应的reactor,主进程将其发送到客户端
- 5,关闭连接也是一样的，通过pipe发送给主进程中的reactor,告诉他要关闭连接fd。
- 6,worker在收到消息时将其设为忙状态，处理完将其设为闲。以供reactor调度。
- 这个变量需要放在共享内存中
- 
- --------------------------------------
- 1,首先开发一个多线程的网络io事件库。ReactorThread
- 2,再开发一个多进程的任务处理程序.   WorkerProcess
- 
- 
- aeReactor结构体
- 
- 
- ***************************************************************************/
+**********************************************************************/
+
 
 #include <stdio.h>
 #include <stddef.h>
@@ -49,14 +21,13 @@ void readFromWorker( aeEventLoop *el, int fd, void *privdata, int mask);
 
 void initOnLoopStart(struct aeEventLoop *el)
 {
-    printf("initOnLoopStart threadid=%d \n" , pthread_self() );
+    //printf("initOnLoopStart threadid=%d \n" , pthread_self() );
 }
 
 void initThreadOnLoopStart( struct aeEventLoop *el )
 {
     //printf("initThreadOnLoopStart threadid=%d \n" , pthread_self() );
 }
-
 
 //异步信号事件
 void onSignEvent( aeEventLoop *el, int fd, void *privdata, int mask)
@@ -141,11 +112,16 @@ void freeClient( aeConnection* c  )
         
         aeDeleteFileEvent( el ,c->fd,AE_READABLE);
         aeDeleteFileEvent( el,c->fd,AE_WRITABLE);
+		
+		ringBuffer_destroy( c->recv_buffer );
+		//ringBuffer_destroy( c->send_buffer );
+		
+		c->disable = 1;
+		servG->connectNum -= 1;
         close(c->fd);
     }
     //zfree(c);
 }
-
 
 void onReadDataFromClient( aeServer* serv , aeConnection* conn , int len  )
 {
@@ -158,7 +134,13 @@ void onReadDataFromClient( aeServer* serv , aeConnection* conn , int len  )
     aePipeData  data = {0};
     data.type = PIPE_EVENT_MESSAGE;
     data.connfd = conn->fd;
-    data.len = strlen( conn->recv_buffer );
+    data.len = len;   
+ 
+    if( ringBuffer_read( conn->recv_buffer , data.data , len) <= 0 )
+    {
+		printf( "ringBuffer_read error\n");
+		return;	
+    }
     reactorSend2Worker( serv , conn->fd , data );
 }
 
@@ -178,21 +160,15 @@ void onCloseByClient( aeServer* serv , aeConnection* conn  )
     freeClient( conn );
 }
 
-
-
 //接收客户端的消息
 void readFromClient(aeEventLoop *el, int fd, void *privdata, int mask)
 {
     aeServer* serv = servG;
     int nread, readlen,bufflen;
-    readlen = 1024;
     aeConnection* c = &serv->connlist[fd];
     
-    memset( c->recv_buffer , 0 , sizeof(c->recv_buffer) );
-    c->recv_length = 0;
-    
-    //if there use "read" need loop
-    nread = recv(fd, c->recv_buffer , readlen , MSG_WAITALL );
+	char buff[TMP_BUFFER_LENGTH];
+    nread = recv(fd,  &buff , sizeof( buff ) , MSG_WAITALL );
     if (nread == -1) {
         if (errno == EAGAIN) {
             nread = 0;
@@ -209,11 +185,14 @@ void readFromClient(aeEventLoop *el, int fd, void *privdata, int mask)
         onCloseByClient( serv ,  &serv->connlist[fd] );
         return;
     }
-    
-    c->recv_length = nread;
+	
+    if( ringBuffer_write( c->recv_buffer , buff , nread ) < 0 )
+    {
+		printf( "RingBuffer_write error buff=%s....\n" , buff );
+    }
+	
     onReadDataFromClient( serv, &serv->connlist[fd] ,nread );
 }
-
 
 //通过pipe发给子进程,如果多个线程同时发给同一个worker,要加锁，每个worker一个锁。
 int reactorSend2Worker(  aeServer* serv , int fd , aePipeData data )
@@ -222,7 +201,7 @@ int reactorSend2Worker(  aeServer* serv , int fd , aePipeData data )
     int workerid = fd % serv->workerNum;
 
 	//此处可以考虑换成pthread_spin_lock
-	pthread_mutex_lock( &serv->workers[workerid].w_mutex );
+    pthread_mutex_lock( &serv->workers[workerid].w_mutex );
     sendlen = anetWrite( serv->workers[workerid].pipefd[0], &data , sizeof( aePipeData ) );
     pthread_mutex_unlock( &serv->workers[workerid].w_mutex );
 
@@ -230,15 +209,15 @@ int reactorSend2Worker(  aeServer* serv , int fd , aePipeData data )
     return sendlen;
 }
 
-
 void readFromWorkerPipe( aeEventLoop *el, int fd, void *privdata, int mask)
 {
     int readlen =0;
-    char buf[10240];
+    char readbuf[TMP_BUFFER_LENGTH];
+	char sendbuf[TMP_BUFFER_LENGTH];
     
 	int workerid = fd % servG->workerNum;
 	pthread_mutex_lock( &servG->workers[workerid].r_mutex );
-    readlen = read( fd, &buf, sizeof( buf ) ); //
+    readlen = read( fd, &readbuf, sizeof( readbuf ) ); //
 	pthread_mutex_unlock( &servG->workers[workerid].r_mutex );
 	
     if( readlen == 0 )
@@ -248,14 +227,15 @@ void readFromWorkerPipe( aeEventLoop *el, int fd, void *privdata, int mask)
     else if( readlen > 0 )
     {
         aePipeData data;
-        memcpy( &data , &buf ,sizeof( data ) );
+        memcpy( &data , &readbuf ,sizeof( data ) );
         
         //message,close
         if( data.type == PIPE_EVENT_MESSAGE )
         {
             if( servG->sendToClient )
             {
-                servG->sendToClient( data.connfd , servG->connlist[data.connfd].send_buffer , data.len  );
+		//ringBuffer_read( servG->connlist[data.connfd].send_buffer , sendbuf , data.len  );
+                servG->sendToClient( data.connfd , data.data , data.len  );
             }
         }
         else if( data.type == PIPE_EVENT_CLOSE )
@@ -279,19 +259,30 @@ void readFromWorkerPipe( aeEventLoop *el, int fd, void *privdata, int mask)
         }
         else
         {
-            printf( "Reactor Recv errno=%d,errstr=%s \n" , errno , strerror( errno ));
+            //printf( "Reactor Recv errno=%d,errstr=%s \n" , errno , strerror( errno ));
         }
     }
 }
 
-
-
 void acceptCommonHandler( aeServer* serv ,int fd,char* client_ip,int client_port, int flags)
 {
+	
+	if( serv->connectNum >= serv->maxConnect )
+	{
+		close( fd );
+		return;
+	}
+	
     serv->connlist[fd].client_ip = client_ip;
     serv->connlist[fd].client_port = client_port;
     serv->connlist[fd].flags |= flags;
     serv->connlist[fd].fd = fd;
+	serv->connlist[fd].disable = 0;
+	
+	serv->connlist[fd].recv_buffer = ringBuffer_create( RECV_BUFFER_LENGTH, 1 );
+	//serv->connlist[fd].send_buffer = ringBuffer_create( SEND_BUFFER_LENGTH, 1 );
+	
+	
     //serv->onConnect( serv , fd );
     if (fd != -1) {
         anetNonBlock(NULL,fd);
@@ -309,6 +300,7 @@ void acceptCommonHandler( aeServer* serv ,int fd,char* client_ip,int client_port
     data.type = PIPE_EVENT_CONNECT;
     data.connfd = fd;
     data.len = 0;
+	serv->connectNum += 1;
     reactorSend2Worker( serv , fd , data );
 }
 
@@ -337,7 +329,6 @@ void onAcceptEvent( aeEventLoop *el, int fd, void *privdata, int mask)
     }
 }
 
-
 void runMainReactor( aeServer* serv )
 {
     int res;
@@ -349,11 +340,11 @@ void runMainReactor( aeServer* serv )
                             NULL
                             );
     
-    printf("master create file event is ok? [%d]\n",res==0 );
-    
-    //timer event
-    //res = aeCreateTimeEvent( aEvBase.el,5*1000,timerCallback,NULL,finalCallback);
-    
+  
+	printf( "Master Run pid=%d and listen socketfd=%d is ok? [%d]\n",getpid(),serv->listenfd,res==0 );
+	printf( "Server start ok ,You can exit program by Ctrl+C !!! \n");
+	
+	
     aeMain( serv->mainReactor->eventLoop );
     aeDeleteEventLoop( serv->mainReactor->eventLoop );
 }
@@ -368,8 +359,6 @@ void masterSignalHandler( int sig )
     send( servG->sigPipefd[1], ( char* )&msg, 1, 0 );
     errno = save_errno;
 }
-
-
 
 void addSignal( int sig, void(*handler)(int), int restart  )
 {
@@ -419,16 +408,19 @@ aeServer* aeServerCreate( char* ip,int port )
 	serv->closeClient = freeClient;
     serv->listen_ip = ip;
     serv->port = port;
+	serv->connectNum = 0;
     serv->reactorNum = 2;
     serv->workerNum = 3;
-    serv->connlist = shm_calloc( 1024 , sizeof( aeConnection ));
+	serv->maxConnect = 1024;
+	
+    serv->connlist = shm_calloc( serv->maxConnect , sizeof( aeConnection ));
     serv->reactorThreads = zmalloc( serv->reactorNum * sizeof( aeReactorThread  ));
     serv->workers = zmalloc( serv->workerNum * sizeof(aeWorkerProcess));
     serv->mainReactor = zmalloc( sizeof( aeReactor ));
     
     serv->mainReactor->eventLoop = aeCreateEventLoop( 10 );
     aeSetBeforeSleepProc( serv->mainReactor->eventLoop ,initOnLoopStart );
-    printf( "Main reactor event loop addr=%x,threadid=%d \n" , serv->mainReactor->eventLoop , pthread_self() );
+    //printf( "Main reactor event loop addr=%x,threadid=%d \n" , serv->mainReactor->eventLoop , pthread_self() );
     
     //安装信号装置
     installMasterSignal( serv  );
@@ -447,7 +439,6 @@ void createReactorThreads( aeServer* serv  )
     void *thread_result;
     aeReactorThread *thread;
     
-    //	pthread_barrier_init(&serv->barrier, NULL, serv->reactorNum+1 );
     for( i=0;i<serv->reactorNum;i++)
     {
         thread = &(serv->reactorThreads[i]);
@@ -462,7 +453,6 @@ void createReactorThreads( aeServer* serv  )
             exit(0);
         }
         thread->thread_id = threadid;
-        printf( "create thread id=%d,i=%d \n" , thread->thread_id,i );
     }
 }
 
@@ -477,10 +467,9 @@ void *reactorThreadRun(void *arg)
     reactorThreadParam* param = (reactorThreadParam*)arg;
     aeServer* serv = param->serv;
     int thid = param->thid;
-    aeEventLoop* el = aeCreateEventLoop( 100 );
+    aeEventLoop* el = aeCreateEventLoop( 1024 );
     serv->reactorThreads[thid].reactor.eventLoop = el;
     
-    //注册worker管道事件,与每个worker的pipe都要注册
     int ret,i;
     for(  i = 0; i < serv->workerNum; i++ )
     {
@@ -492,12 +481,10 @@ void *reactorThreadRun(void *arg)
         }
     }
     
-    //printf( "threadReactor size=%d,el addr=%x,threadid=%d,thid=%d \n" , el->setsize,el,  pthread_self(),thid  );
     aeSetBeforeSleepProc( el ,initThreadOnLoopStart );
     aeMain(  el );
     aeDeleteEventLoop( el );
 	el = NULL;
-    //printf( "thread end loop id=%d \n" , thid );
 }
 
 
@@ -585,13 +572,46 @@ void stopReactorThread( aeServer* serv  )
 	}
 }
 
+int freeConnectBuffers( aeServer* serv )
+{
+	int i;
+	int count = 0;
+	int minfd = 3;//TODO::可以精确赋值
+	
+	if( serv->connectNum == 0 )
+	{
+		return 0;
+	}
+	
+	for( i = minfd; i < serv->maxConnect ; i++ )
+	{
+		if( serv->connlist[i].disable == 0 )
+		{
+			ringBuffer_destroy( serv->connlist[i].recv_buffer );
+			//ringBuffer_destroy( serv->connlist[i].send_buffer );
+			count++;
+		}
+		
+		if( count ==  serv->connectNum )
+		{
+			break;
+		}
+			
+	}
+	return count;
+}
+
+
 void destroyServer( aeServer* serv )
 {
     //1,停止,释放线程
     stopReactorThread( serv );
     
-    //2,释放共享内存
-    shm_free( serv->connlist,1 );
+	//释放收发缓冲区
+    freeConnectBuffers( serv );
+	
+	//2,释放共享内存
+	shm_free( serv->connlist,1 );
     
     //3,释放由zmalloc分配的内存
     if( serv->reactorThreads )
@@ -625,12 +645,14 @@ int startServer( aeServer* serv )
     listenToPort( serv->listen_ip, serv->port , sockfd , &sock_count );
     serv->listenfd = sockfd[0];
     
-    //创建进程要先于线程，否则，会连线程一起fork了。
+    //创建进程要先于线程，否则，会连线程一起fork了,好像会这样。。。
     createWorkerProcess( serv );	
     
     //创建子线程,每个线程都监听所有worker管道
     createReactorThreads( serv );
     
+	__SLEEP_WAIT__;
+	
     //运行主reactor
     runMainReactor( serv );
     

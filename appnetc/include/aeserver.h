@@ -10,22 +10,31 @@
 #include <pthread.h>
 #include "ae.h"
 #include "share_memory.h"
+#include "ring_buffer.h"
+
+
 #define MAXFD 1024
 #define WORKER_PROCESS_COUNT 3
 #define REACTOR_THREAD_COUNT 2
+
+#define TMP_BUFFER_LENGTH  65535
+#define RECV_BUFFER_LENGTH  65535
+#define SEND_BUFFER_LENGTH  65535
+
+#define __SLEEP_WAIT__	usleep( 10000 )
+
+
 
 struct aeEventLoop;
 typedef struct _aeConnection
 {
   int flags;
   int fd;
-  char recv_buffer[10240];
-  char send_buffer[10240];
-  int  recv_length; //last recv length
-  int  read_index;
-  int  send_index;
+  char disable; 
   char* client_ip;
   int client_port;
+  ringBuffer* recv_buffer;
+  //ringBuffer* send_buffer;
 }aeConnection;
 
 typedef struct _aeServer aeServer;
@@ -62,7 +71,7 @@ typedef struct _aeWorker
 	pid_t pid;
 	int pipefd;
 	int running;
-	int maxClient;
+	int maxEvent;
 	aeEventLoop *el;
 }aeWorker;
 
@@ -70,7 +79,7 @@ typedef struct _aeReactorThread
 {
     pthread_t thread_id;
     aeReactor reactor;
-    reactorThreadParam* param
+    reactorThreadParam* param;
     //swLock lock;
 } aeReactorThread;
 
@@ -90,6 +99,9 @@ struct _aeServer
    void *ptr2;
    int reactorNum;
    int workerNum;
+   int maxConnect;
+   int connectNum;
+   
    aeReactor* mainReactor;
    aeConnection* connlist;
    aeReactorThread *reactorThreads;
@@ -97,8 +109,6 @@ struct _aeServer
    aeWorkerProcess *workers; //主进程中保存的worker相关信息数组。
    aeWorker* worker;	//子进程中的全局变量,子进程是独立空间，所以只要一个标识当前进程
    int sigPipefd[2];
-   int recvPipefd[2];
-
    //reactor->client
    int  (*sendToClient)(  int fd, char* data , int len );
    void (*closeClient)( aeConnection *c  );
@@ -107,7 +117,7 @@ struct _aeServer
    int  (*close)( int fd );
    
    void (*onConnect)( aeServer* serv ,int fd );
-   void (*onRecv)( aeServer *serv, aeConnection* c , int len );
+   void (*onRecv)( aeServer *serv, aeConnection* c , char* buff , int len );
    void (*onClose)( aeServer *serv , aeConnection *c );
    void (*runForever )( aeServer* serv );
 };
@@ -118,7 +128,7 @@ struct _reactorThreadParam
 	aeServer* serv;
 };
 
-#define PIPE_DATA_LENG 8
+#define PIPE_DATA_LENG 1024
 #define PIPE_DATA_HEADER_LENG 1+2*sizeof(int)
 
 #pragma pack(1)

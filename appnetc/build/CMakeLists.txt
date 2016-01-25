@@ -11,6 +11,7 @@ SET (HEADER_FILES
   ../include/anet.h 
   ../include/config.h
   ../include/share_memory.h
+  ../include/ring_buffer.h
 )
 
 SET (SOURCE_FILES
@@ -22,6 +23,7 @@ SET (SOURCE_FILES
  ../src/network/anet.c 
  ../src/network/ae_epoll.c
  ../src/network/share_memory.c
+ ../src/network/ring_buffer.c
 )
 
 

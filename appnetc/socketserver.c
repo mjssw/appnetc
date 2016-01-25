@@ -2,18 +2,17 @@
 #include "include/aeserver.h"
 aeServer* serv;
 
-void appnetServerOnRecv( aeServer* s , aeConnection *c , int len );
+void appnetServerOnRecv( aeServer* s , aeConnection *c , char* buff , int len );
 void appnetServerOnClose( aeServer* s , aeConnection *c );
 void appnetServerOnConnect( aeServer* s , int fd );
 aeServer* appnetTcpServInit( char* listen_ip , int port  );
 
-void appnetServerOnRecv( aeServer* serv , aeConnection *conn , int len )
+void appnetServerOnRecv( aeServer* serv , aeConnection *conn , char* buff , int len )
 {
-	 printf( "PHPD recv len=%lu,data=%s,threadid=%d\n" ,strlen( conn->recv_buffer ) ,
-			conn->recv_buffer,pthread_self() );
+	 printf( "PHPD len=%d,recv=%s \n" , len ,buff );
 	 
-	 char* buff = "recv ok!";
-	 serv->send( conn->fd , buff , strlen( buff ));
+	 char* send_buff = "recv ok!";
+	 serv->send( conn->fd , send_buff , strlen( send_buff ));
 	 //serv->close( conn->fd );
 }
 
