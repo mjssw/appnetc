@@ -9,11 +9,11 @@ aeServer* appnetTcpServInit( char* listen_ip , int port  );
 
 void appnetServerOnRecv( aeServer* serv , aeConnection *conn , char* buff , int len )
 {
-	 printf( "PHPD len=%d,recv=%s \n" , len ,buff );
+	 printf( "PHPD len=%d,recv=[%s] \n" , len ,buff ); 
+	 char* send_buff = "ww";
 	 
-	 char* send_buff = "recv ok!";
 	 serv->send( conn->fd , send_buff , strlen( send_buff ));
-	 //serv->close( conn->fd );
+//	 serv->close( conn->fd );
 }
 
 void appnetServerOnClose( aeServer* s , aeConnection *c )
