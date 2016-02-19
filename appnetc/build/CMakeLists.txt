@@ -13,6 +13,11 @@ SET (HEADER_FILES
   ../include/share_memory.h
   ../include/ring_buffer.h
   ../include/sds.h
+  ../include/http_request.h
+  ../include/dict.h
+  ../include/sha1.h
+  ../include/websocket.h
+  ../include/base64.h
 )
 
 SET (SOURCE_FILES
@@ -26,8 +31,12 @@ SET (SOURCE_FILES
  ../src/network/share_memory.c
  ../src/network/ring_buffer.c
  ../src/network/sds.c
+ ../src/network/http_request.c
+ ../src/network/dict.c
+ ../src/network/base64.c
+ ../src/network/sha1.c
+ ../src/network/websocket.c
 )
-
 
 ADD_EXECUTABLE( SockServer ${HEADER_FILES}  ${SOURCE_FILES} )
 TARGET_LINK_LIBRARIES( SockServer pthread  )  
